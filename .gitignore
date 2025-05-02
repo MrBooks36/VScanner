@@ -1,0 +1,6 @@
+test*
+VScanner*
+*.exe
+__pycache__
+key.txt
+proxy.json
