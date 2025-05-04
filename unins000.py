@@ -1,6 +1,7 @@
 from winreg import DeleteKey, HKEY_CLASSES_ROOT
 from sys import argv
 from os.path import dirname, abspath, exists
+from os import remove, getlogin
 from shutil import rmtree, copytree
 from time import sleep
 from subprocess import run
@@ -21,6 +22,7 @@ def uninstall():
     copytree(script_directory, "C:\\Windows\\TEMP\\VScanner")
     file = open("C:\\Windows\\TEMP\\temp.asdf", "w")
     file.write(script_directory)
+    remove(f'c:\\users\\{getlogin()}\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\VScanner')
     run('start cmd /c C:\\Windows\\TEMP\\VScanner\\unins000.exe uninstall2', shell=True)
 
 def uninstall2():
