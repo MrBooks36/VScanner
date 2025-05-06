@@ -1,11 +1,12 @@
 from json import load, JSONDecodeError
-from os.path import exists, isfile, dirname
+from os.path import exists, isfile, dirname, abspath
 from os import chdir
 from sys import argv
 from time import sleep
 from requests import post, get
 
 def scan(file):
+    file = abspath(file)
     chdir(dirname(argv[0]))
     # Load proxy settings
     if exists("proxy.json"):
