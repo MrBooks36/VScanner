@@ -40,14 +40,20 @@ def uninstall():
     copytree(script_directory, "C:\\Windows\\TEMP\\VScanner")
     file = open("C:\\Windows\\TEMP\\temp.asdf", "w")
     file.write(script_directory)
-    remove(f'c:\\users\\{getlogin()}\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\VScanner')
-    remove('C:/ProgramData/Microsoft/Windows/Start Menu/Programs/VScanner.lnk')
+    try:
+     remove(f'c:\\users\\{getlogin()}\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\VScanner.lnk')
+    except: pass 
+    try:
+        remove('C:/ProgramData/Microsoft/Windows/Start Menu/Programs/VScanner.lnk')
+    except: pass    
+    remove_registry_entry('Vscanner')
     run('start cmd /c C:\\Windows\\TEMP\\VScanner\\unins000.exe uninstall2', shell=True)
 
 def uninstall2():
         file = open("C:\\Windows\\TEMP\\temp.asdf", "r")
         path = file.read()
         sleep(3)
+        rmtree(path)
         rmtree(path)
         return        
 

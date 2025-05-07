@@ -1,5 +1,4 @@
 @echo off
-del VScanner.exe
 python -m nuitka --standalone --onefile --remove-output --enable-plugin=tk-inter --mingw64  main.py
 powershell sleep 3
 rename main.exe VScanner.exe

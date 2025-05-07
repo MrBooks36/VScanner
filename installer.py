@@ -61,12 +61,12 @@ class LoadingScreen:
         finally:
          CloseKey(reg_key)    
 
-    def create_shortcut(self, exe_path, shortcut_name="VScanner"):
+    def create_shortcut(self, exe_path, shortcut_name="VScanner", where="C:/ProgramData/Microsoft/Windows/Start Menu/Programs/"):
         CoInitialize() 
         try:
          # Define the path for the Start Menu
-         start_menu_path = "C:/ProgramData/Microsoft/Windows/Start Menu/Programs/"
-         shortcut_path = join(start_menu_path, f"{shortcut_name}.lnk")
+         
+         shortcut_path = join(where, f"{shortcut_name}.lnk")
          if not exists(shortcut_path):
           # Create the shortcut
           shell = Dispatch('WScript.Shell')
@@ -150,6 +150,7 @@ class LoadingScreen:
             exe_path=join(user_home, "AppData", "Local", "Programs", "VScanner", "unins000.exe")
             )
             self.create_shortcut(script_path)
+            self.create_shortcut(script_path, where='C:/ProgramData/Microsoft/Windows/Start Menu/Programs/Startup')
         except:
             error_message = str(format_exc())
             # Log error to a file for troubleshooting

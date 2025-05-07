@@ -1,35 +1,43 @@
 from json import load, JSONDecodeError
 from os.path import exists, isfile, dirname, abspath
-from os import chdir
+from os import chdir, getcwd
 from sys import argv
 from time import sleep
 from requests import post, get
+cwd = getcwd()
+def log(text):
+    with open('log.tmp', 'a') as file:
+        file.write(f'{text}\n')
 
-def scan(file):
-    file = abspath(file)
-    chdir(dirname(argv[0]))
-    # Load proxy settings
-    if exists("proxy.json"):
-        try:
-            with open('proxy.json', 'r') as proxy_file:
-                proxy = load(proxy_file)
-        except JSONDecodeError:
-            print("Error decoding proxy.json. Ensure it's a valid JSON.")
-            proxy = None
-    else:
-        proxy = None
+def scan_with_virustotal(file_path, api_key_file='key.txt', proxy_file='proxy.json'):
+    """
+    Scans a file using VirusTotal and rescans if no result from Microsoft Defender is available.
 
-    if exists('key.txt'): API_KEY = open('key.txt', 'r').read()
-    else:
-        print('API Key not set')
-        return
-    FILE_PATH = file
+    :param file_path: Path to the file to be scanned.
+    :param api_key_file: Path to the file containing the API key.
+    :param proxy_file: Path to the JSON file containing the proxy configuration.
+    """
+    def load_proxy(proxy_file):
+        """Load proxy settings if the file exists."""
+        if exists(proxy_file):
+            try:
+                with open(proxy_file, 'r') as proxy_fp:
+                    return load(proxy_fp)
+            except JSONDecodeError:
+                log(f"Error decoding {proxy_file}. Ensure it's a valid JSON.")
+        return None
 
-    if not isfile(FILE_PATH):
-        print("The specified file does not exist.")
-        return
+    def load_api_key(api_key_file):
+        """Load the API key."""
+        if exists(api_key_file):
+            with open(api_key_file, 'r') as key_fp:
+                return key_fp.read().strip()
+        else:
+            log(f"API Key not set in {api_key_file}")
+            return None
 
-    def scan_file(api_key, file_path):
+    def scan_file(api_key, file_path, proxy):
+        """Send a file to VirusTotal for scanning."""
         url = 'https://www.virustotal.com/api/v3/files'
         headers = {'x-apikey': api_key}
         try:
@@ -38,14 +46,19 @@ def scan(file):
                 response = post(url, headers=headers, files=files, proxies=proxy)
             if response.status_code == 200:
                 return response.json()
+            if response.status_code == 413:
+                log('File too large')
+                return None
+                
             else:
-                print(f"Error: {response.status_code} - {response.text}")
+                log(f"Error: {response.status_code} - {response.text}")
                 return None
         except Exception as e:
-            print(f"An error occurred while scanning the file: {e}")
+            log(f"An error occurred while scanning the file: {e}")
             return None
 
-    def get_report(api_key, analysis_id):
+    def get_report(api_key, analysis_id, proxy):
+        """Retrieve the scan report from VirusTotal."""
         sleep(10)
         url = f'https://www.virustotal.com/api/v3/analyses/{analysis_id}'
         headers = {'x-apikey': api_key}
@@ -55,52 +68,70 @@ def scan(file):
                 if response.status_code == 200:
                     return response.json()
                 elif response.status_code == 404:
-                    print("Report not ready yet, retrying...")
+                    log("Report not ready yet, retrying...")
                     sleep(10)  # Wait before retrying
                 else:
-                    print(f"Error: {response.status_code} - {response.text}")
+                    log(f"Error: {response.status_code} - {response.text}")
                     return None
             except Exception as e:
-                print(f"An error occurred while retrieving the report: {e}")
+                log(f"An error occurred while retrieving the report: {e}")
                 return None
 
     def display_score(report):
+        """Display the malicious score of the file."""
         try:
-            # Extract score from the report
             scan_results = report['data']['attributes']['results']
             stats = report['data']['attributes']['stats']
             malicious = stats['malicious']
             total = sum(stats.values())
 
-            print(f"Malicious Score: {malicious}/{total}")
-
+            log(f"Malicious Score: {malicious}/{total}")
+            
             # Display percentage
             try:
-                print(str(round((malicious / total) * 100)) + '%')
+                percentage = round((malicious / total) * 100)
+                log(f"{percentage}%")
             except ZeroDivisionError:
-                print('0%')
+                percentage = 0
+                log('0%')
 
-            # Check specifically for Microsoft Defender's result
-            microsoft_defender_result = scan_results.get('Microsoft')
-            if microsoft_defender_result:
-                if microsoft_defender_result['category'] == 'malicious':
-                    print("Microsoft Defender flagged this file as malicious.")
-                else:
-                    print("Microsoft Defender did not flag this file as malicious.")
-            else:
-                print("No result from Microsoft Defender available.")
-
+            # Return Microsoft Defender's result 
+            return [scan_results.get('Microsoft'), percentage, f"{malicious}/{total}"]
         except KeyError:
-            print("Could not retrieve scan score from report.")
+            log("Could not retrieve scan score from report.")
+            return None
 
-    # Scan the file
-    scan_result = scan_file(API_KEY, FILE_PATH)
-    if scan_result:
-        analysis_id = scan_result['data']['id']
-        print(f"Analysis ID: {analysis_id}")
+    # Load API key and proxy
+    chdir(dirname(argv[0]))
+    log(file_path)
+    api_key = load_api_key(api_key_file)
+    proxy = load_proxy(proxy_file)
 
-        # Get the report using the analysis ID
-        sleep(10)
-        report = get_report(API_KEY, analysis_id)
-        if report:
-            display_score(report)
+    if not api_key or not isfile(file_path):
+        log("Exiting due to missing API key or invalid file.")
+        return "Exiting due to missing API key or invalid file."
+
+    file_path = abspath(file_path)
+
+    # Scan the file and retrieve report
+    while True:
+        scan_result = scan_file(api_key, file_path, proxy)
+        if scan_result != None:
+            analysis_id = scan_result['data']['id']
+            log(f"Analysis ID: {analysis_id}")
+
+            # Get the report using the analysis ID
+            report = get_report(api_key, analysis_id, proxy)
+            if report:
+                defender_result = display_score(report)
+                if defender_result[0]:
+                    # Display Microsoft Defender's result
+                    if defender_result[0]['category'] == 'malicious':
+                        log("Microsoft Defender flagged this file as malicious.")
+                    else:
+                        log("Microsoft Defender did not flag this file as malicious.")
+                        return defender_result
+                    break
+                else:
+                    log("No result from Microsoft Defender available. Rescanning...")
+        else: return        

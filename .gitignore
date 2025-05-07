@@ -4,3 +4,4 @@ VScanner*
 __pycache__
 key.txt
 proxy.json
+*.tmp

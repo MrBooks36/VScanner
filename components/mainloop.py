@@ -1,7 +1,7 @@
 from time import sleep
 from os import listdir
 from os.path import join, isfile, expanduser
-from components.scan import scan
+from components.scan import scan_with_virustotal
 
 def get_files_in_directory(directory):
     """Returns a set of file paths in the given directory."""
@@ -27,9 +27,8 @@ def monitor_downloads(download_dir, check_interval=5):
         if new_files:
             for file_path in new_files:
                 print(f"New file detected: {file_path}")
-                scan(file_path)
+                scan_with_virustotal(file_path)
 
-        
         # Update the previous_files set
         previous_files = current_files
 
